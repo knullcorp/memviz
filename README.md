@@ -13,14 +13,15 @@ que no depende de la CPU del host.
 
 ```bash
 pip install unicorn capstone pyelftools
-# opcional, solo para --asm y --watch (ensamblar snippets):
-pip install pwntools
+# ademas, para --asm y --watch necesitas el ensamblador NASM:
+#   sudo pacman -S nasm        # Arch
+#   sudo apt install nasm      # Debian/Ubuntu
 ```
 
 En Arch Linux:
 
 ```bash
-sudo pacman -S python-unicorn python-capstone python-pyelftools python-pwntools
+sudo pacman -S python-unicorn python-capstone python-pyelftools nasm
 ```
 
 ## Uso
@@ -48,8 +49,8 @@ cambió · cian = RSP y syscalls.
 ## Qué emula
 
 - CPU x86-64 completa (todas las instrucciones, vía Unicorn).
-- Syscalls `write` (imprime a la salida) y `exit`/`exit_group` (termina). Los
-  demás se muestran y se saltan.
+- Syscalls `write` (imprime a la salida), `exit`/`exit_group` (termina) y
+  `execve` (muestra el path que lanzaría). Los demás se muestran y se saltan.
 
 ## Límite
 

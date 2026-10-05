@@ -1,7 +1,9 @@
-# memviz - nucleo (modos <binario> y --hex)
+# memviz - dependencias de Python (pip)
 unicorn
 capstone
 pyelftools
 
-# solo para --asm y --watch (ensamblar snippets de assembly)
-pwntools
+# Nota: los modos --asm y --watch necesitan ademas el ensamblador NASM,
+# que es un paquete del sistema (no de pip):
+#   Arch:            sudo pacman -S nasm
+#   Debian/Ubuntu:   sudo apt install nasm

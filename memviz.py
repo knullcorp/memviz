@@ -14,9 +14,9 @@ Uso:
     (agrega --auto para correr sin pausas en los dos primeros)
 
 Controles (modo interactivo): Enter = siguiente instruccion, q + Enter = salir.
---asm y --watch necesitan pwntools (para ensamblar); los demas no.
+--asm y --watch necesitan 'nasm' (ensamblan tu snippet en sintaxis NASM); los
+demas modos no.
 """
-import re
 import sys
 
 from unicorn import *
@@ -102,6 +102,16 @@ def hook_syscall(mu, user):
         print(f"  {CYAN}>> syscall exit({code}) -> fin del programa{R}")
         user["done"] = True
         mu.emu_stop()
+    elif rax == 59:  # execve(path, argv, envp)
+        path_ptr = mu.reg_read(UC_X86_REG_RDI)
+        try:
+            raw = bytes(mu.mem_read(path_ptr, 32)).split(b"\x00", 1)[0]
+        except UcError:
+            raw = b"?"
+        print(f"  {CYAN}>> syscall execve({raw!r}) -> el emulador no lanza shell, "
+              f"pero ya armaste el path y argv en la pila{R}")
+        user["done"] = True
+        mu.emu_stop()
     else:
         print(f"  {CYAN}>> syscall #{rax} (no emulado, lo salto){R}")
 
@@ -167,27 +177,37 @@ def run_trace(code, auto=False):
         print(f"{B}salida del programa:{R} {state['output']!r}")
 
 
-def preprocess_asm(src):
-    """Hace tolerante el snippet: quita comentarios estilo NASM (';') y
-    directivas que pwntools ya agrega (global/section/bits/_start:), para que
-    puedas pegar codigo casi tal cual en vez de instrucciones peladas."""
-    drop = re.compile(r"^\s*(global|extern|section|segment|bits|default|cpu)\b", re.I)
-    label_start = re.compile(r"^\s*_{1,2}start\s*:\s*$", re.I)
-    out = []
-    for line in src.splitlines():
-        line = line.split(";", 1)[0]          # comentario NASM ;
-        if drop.match(line) or label_start.match(line):
-            continue
-        out.append(line)
-    return "\n".join(out)
-
-
 def assemble(src):
-    import os
-    os.environ.setdefault("TERM", "xterm")
-    from pwn import asm, context
-    context.update(arch="amd64", os="linux", log_level="error")
-    return asm(preprocess_asm(src))
+    """Ensambla un snippet NASM (la sintaxis del curso) a bytes con 'nasm -f bin'.
+    Acepta comentarios ';', cadenas como '/bin//sh', global/section, etc. tal cual.
+    BITS 64 la ponemos nosotros; 'global' no aplica en formato bin, lo quitamos."""
+    import subprocess, tempfile, os
+    lines = ["BITS 64"]
+    for line in src.splitlines():
+        head = line.lstrip().lower()
+        if head.startswith(("bits ", "[bits", "global ", "default ")):
+            continue
+        lines.append(line)
+    asm_src = "\n".join(lines) + "\n"
+    src_path = out_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".asm", delete=False) as f:
+            f.write(asm_src)
+            src_path = f.name
+        out_path = src_path + ".bin"
+        r = subprocess.run(["nasm", "-f", "bin", "-o", out_path, src_path],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError("nasm:\n" + (r.stderr or r.stdout).strip())
+        with open(out_path, "rb") as g:
+            return g.read()
+    finally:
+        for p in (src_path, out_path):
+            if p and os.path.exists(p):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
 
 
 def watch(path):
