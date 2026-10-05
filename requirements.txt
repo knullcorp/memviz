@@ -1,0 +1,7 @@
+# memviz - nucleo (modos <binario> y --hex)
+unicorn
+capstone
+pyelftools
+
+# solo para --asm y --watch (ensamblar snippets de assembly)
+pwntools
